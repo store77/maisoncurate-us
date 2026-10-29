@@ -1,0 +1,52 @@
+name: MaisonCurate 12-Hour Amazon Affiliate Autopilot
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-products-and-reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish 20 Best-Seller Products + 5 Review Articles & Ping Search Engines
+        env:
+          AMAZON_TAG: ${{ secrets.AMAZON_TAG }}
+          CUSTOM_SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME="${{ github.event.repository.name }}"
+          if [ -n "$CUSTOM_SITE_URL" ]; then
+            export SITE_URL="$CUSTOM_SITE_URL"
+          else
+            export SITE_URL="https://${OWNER}.github.io/${REPO_NAME}"
+          fi
+          echo "Publishing to SITE_URL: $SITE_URL"
+          python maison_engine.py
+
+      - name: Commit & Deploy Updated Storefront to /docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ docs/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore(12h-autopilot): publish 20 best-seller products + 5 review articles [skip ci]"
+            git push
+          fi
